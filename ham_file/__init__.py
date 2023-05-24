@@ -7,6 +7,8 @@ class HamFile:
     re_scene_change = re.compile(r'scene\s+(.+)$', flags=re.IGNORECASE)
     re_speaker_change = re.compile(r'^(.+?)\s*:\s*(.*?)\s*$')
     re_variable = re.compile(r'\$([a-zA-Z]\w*)')
+    re_flag = re.compile(r'^flag\s+(.+)\s*', flags=re.IGNORECASE)
+    re_unflag = re.compile(r'^unflag\s+', flags=re.IGNORECASE)
     re_comment = re.compile(r'#(.*)$')
 
     def __init__(self, file):
@@ -57,6 +59,8 @@ class HamFile:
 
         current_scene = None
         current_speaker = None
+        current_flags = ()
+
         text = ""
 
         def add_line(text: str):
@@ -65,7 +69,7 @@ class HamFile:
             if not current_scene:
                 raise HamFileError("No scene", line_number)
 
-            line = HamFileLine(current_speaker, text.strip())
+            line = HamFileLine(current_speaker, text.strip(), current_flags)
             current_scene.lines.append(line)
         
         for line in file:
@@ -80,6 +84,18 @@ class HamFile:
             if HamFile.re_assignment.match(line):
                 continue
 
+            # Set Flag
+            match = HamFile.re_flag.match(line)
+            if match:
+                flag = match.groups(1)[0]
+                current_flags += (flag,)
+                continue
+
+            # Clear flags
+            if HamFile.re_unflag.match(line):
+                current_flags = ()
+                continue
+
             # Scene Change
             match = HamFile.re_scene_change.match(line)
             if match:
@@ -92,6 +108,7 @@ class HamFile:
                 if current_scene:
                     scenes.append(current_scene)
                 current_scene = HamFileScene(match.group(1))
+                current_flags = ()
                 continue
 
             # Speaker Change
