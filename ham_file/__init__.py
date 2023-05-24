@@ -11,11 +11,14 @@ class HamFile:
     re_unflag = re.compile(r'^unflag\s+', flags=re.IGNORECASE)
     re_comment = re.compile(r'#(.*)$')
 
-    def __init__(self, file):
+    def __init__(self, file, file_name = ''):
         if type(file) == str:
+            self.file_name = file
+
             with open(file, 'r') as in_file:
                 self._read_from(in_file)
         else:
+            self.file_name = file_name
             self._read_from(file)
 
     def fill_variables(self, text:str) -> str:
@@ -26,11 +29,10 @@ class HamFile:
         return HamFile.re_variable.sub(sub, str(text))
 
     def _read_from(self, file):        
-        self.variables = HamFile._read_variables(file)
+        self.variables = self._read_variables(file)
         self.scenes = self._read_scenes(file)
 
-    @staticmethod
-    def _read_variables(file) -> dict[str:str]:
+    def _read_variables(self, file) -> 'dict[str:str]':
         variables = {}
 
         line_number = 0
@@ -46,12 +48,12 @@ class HamFile:
                 var_name = match.group(1).upper()
                 value = match.group(2)
                 if var_name in variables:
-                    raise HamFileError("Variable already exists", line_number)
+                    raise HamFileError("Variable already exists", line_number, self.file_name)
                 variables[var_name] = value
 
         return variables
     
-    def _read_scenes(self, file) -> list[HamFileScene]:
+    def _read_scenes(self, file) -> 'list[HamFileScene]':
         scenes = []
 
         line_number = 0
@@ -65,9 +67,9 @@ class HamFile:
 
         def add_line(text: str):
             if not current_speaker:
-                raise HamFileError("No speaker", line_number)
+                raise HamFileError("No speaker", line_number, self.file_name)
             if not current_scene:
-                raise HamFileError("No scene", line_number)
+                raise HamFileError("No scene", line_number, self.file_name)
 
             line = HamFileLine(current_speaker, text.strip(), current_flags)
             current_scene.lines.append(line)
@@ -134,5 +136,8 @@ class HamFile:
 
         if text:
             add_line(text)
+
+        if current_scene:
+            scenes.append(current_scene)
 
         return scenes
