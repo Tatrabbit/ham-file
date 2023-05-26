@@ -60,6 +60,23 @@ class LineBase:
         return self._line_comment
 
 
+class CommentLine (LineBase):
+    def __init__(self, text:str):
+        self._text = text.rstrip()
+        super().__init__(None)
+
+
+    def text(self, value:str=None) -> str:
+        if value:
+            self._text = value
+            self._on_change()
+        return self._text
+    
+
+    def _on_change(self):
+        self._raw_line = "#%s" % self._text
+
+
 class InstructionLine (LineBase):
     def __init__(self, instruction:str, text:str):
         self._instruction = instruction.upper().strip()

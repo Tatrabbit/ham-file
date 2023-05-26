@@ -15,6 +15,14 @@ class HamFile:
         self.file_name = file_name
         self.scenes = [HamFileScene()]
 
+    
+    def __str__(self) -> str:
+        text = []
+
+        for scene in self.scenes:
+            for line in scene.lines:
+                text.append(line.pretty_print())
+        return '\n'.join(text)
 
     def append_scene_line(self, name:str) -> HamFileScene:
         scene = HamFileScene(name)
@@ -67,6 +75,8 @@ class HamFile:
         current_speaker = None
         current_flags = ()
 
+        comment = None
+
         def add_line(raw_line:str, text: str):
             if not current_speaker:
                 raise HamFileError("No speaker", line_number, self.file_name)
@@ -82,7 +92,7 @@ class HamFile:
             else:
                 action = ''
 
-            line = TextLine(current_speaker, text.strip(), current_flags, raw_line)    
+            line = TextLine(current_speaker, text.strip(), current_flags, raw_line)
             current_scene.lines.append(line)
 
             if match:
@@ -90,10 +100,15 @@ class HamFile:
         
         for line in file:
             raw_line = line
+            line = line.strip()
             line_number += 1
 
-            # Skip comments/blanks
-            line = HamFile.re_comment.sub('', line).strip()
+            # Strip Comments
+            match = HamFile.re_comment.match(line)
+            if match:
+                current_scene.lines.append(CommentLine(match.group(1)))
+                continue
+
             if len(line) == 0:
                 continue
 
