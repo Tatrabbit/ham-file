@@ -74,6 +74,13 @@ class InstructionLine (LineBase):
 
         super().__init__(None)
 
+
+    def instruction(self, value:str=None) -> str:
+        if value:
+            self._instruction = value
+            self._on_change()
+        return self._instruction
+
     
     def text(self, value:str=None) -> str:
         if value:
@@ -87,7 +94,7 @@ class InstructionLine (LineBase):
     
     
     def _on_change(self):
-        self._raw_line = "%s %s" % (self._instruction, self._text)
+        self._raw_line = "!%s %s" % (self._instruction, self._text)
     
 
 class VariableLine (LineBase):

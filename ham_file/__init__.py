@@ -3,14 +3,11 @@ from .exceptions import *
 from .scene import *
 
 class HamFile:
+    re_instruction = re.compile(r'^\s*!\s*([a-z][a-z0-9]*)(?:\s+([^#]+).*)?$', flags=re.IGNORECASE)
     re_assignment = re.compile(r'\s*([a-zA-Z]\w*)\s*=\s*(.+)\s*$')
-    re_scene_change = re.compile(r'\s*scene\s+([^#]+).*$', flags=re.IGNORECASE)
-    re_action = re.compile(r'\s*action\s+([^#]+).*$', flags=re.IGNORECASE)
     re_line_action = re.compile(r'\s*\[([^\]]*)\]\s*')
     re_speaker_change = re.compile(r'^(.+?)\s*:\s*(.*?)\s*$')
     re_variable = re.compile(r'\$([a-zA-Z]\w*)')
-    re_flag = re.compile(r'^\s*flag\s+(.+)\s*', flags=re.IGNORECASE)
-    re_unflag = re.compile(r'^\s*unflag\s+', flags=re.IGNORECASE)
     re_comment = re.compile(r'^\s*#(.*)$')
 
 
@@ -60,18 +57,6 @@ class HamFile:
         return HamFile.re_variable.sub(sub, str(text))
 
 
-    # def _read_variables(self, file) -> 'dict[str:str]':
-    #     line_number = 0
-    #     file.seek(0)
-    #     for line in file:
-    #         line_number += 1
-
-    #         # Ignore Comments
-    #         # line = HamFile.re_comment.sub('', line).strip()
-
-    #         match = HamFile.re_assignment.match(line)
-
-
     def _read_scenes(self, file) -> 'list[HamFileScene]':
         line_number = 0
         file.seek(0)
@@ -112,12 +97,6 @@ class HamFile:
             if len(line) == 0:
                 continue
 
-            # Actions
-            match = HamFile.re_action.match(line)
-            if match:
-                current_scene.lines.append(InstructionLine('ACTION', match.group(1).strip()))
-                continue
-
             # Variable assignments
             match = HamFile.re_assignment.match(line)
             if match:
@@ -130,28 +109,29 @@ class HamFile:
                 current_scene.lines.append(variable_line)
                 continue
 
-            # Set Flag
-            match = HamFile.re_flag.match(line)
+            # Instructions
+            match = HamFile.re_instruction.match(line)
             if match:
-                flag = match.groups(1)[0].lower()
-                flag = re.sub( r'\s+', ' ', flag)
-                current_flags += (flag,)
-                continue
+                instruction = InstructionLine(match.group(1), match.group(2).strip())
+                instruction_name = instruction.instruction()
 
-            # Clear flags
-            if HamFile.re_unflag.match(line):
-                current_flags = ()
-                continue
+                if instruction_name == 'FLAG':
+                    flag = instruction.text().lower()
+                    flag = re.sub( r'\s+', ' ', flag)
+                    current_flags += (flag,)
 
-            # Scene Change
-            match = HamFile.re_scene_change.match(line)
-            if match:
-                current_speaker = None
+                elif instruction_name == 'UNFLAG':
+                    current_flags = ()
 
-                if current_scene:
-                    self.scenes.append(current_scene)
-                current_scene = HamFileScene(match.group(1))
-                current_flags = ()
+                elif instruction_name == 'SCENE':
+                    current_speaker = None
+
+                    if current_scene:
+                        self.scenes.append(current_scene)
+                    current_scene = HamFileScene(match.group(1))
+                    current_flags = ()
+
+                current_scene.lines.append(instruction)
                 continue
 
             # Speaker Change
