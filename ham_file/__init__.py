@@ -3,23 +3,54 @@ from .exceptions import *
 from .scene import *
 
 class HamFile:
-    re_assignment = re.compile(r'([a-zA-Z]\w*)\s*=\s*(.+)\s*$')
-    re_scene_change = re.compile(r'scene\s+(.+)$', flags=re.IGNORECASE)
+    re_assignment = re.compile(r'\s*([a-zA-Z]\w*)\s*=\s*(.+)\s*$')
+    re_scene_change = re.compile(r'\s*scene\s+([^#]+).*$', flags=re.IGNORECASE)
+    re_action = re.compile(r'\s*action\s+([^#]+).*$', flags=re.IGNORECASE)
+    re_line_action = re.compile(r'\s*\[([^\]]*)\]\s*')
     re_speaker_change = re.compile(r'^(.+?)\s*:\s*(.*?)\s*$')
     re_variable = re.compile(r'\$([a-zA-Z]\w*)')
-    re_flag = re.compile(r'^flag\s+(.+)\s*', flags=re.IGNORECASE)
-    re_unflag = re.compile(r'^unflag\s+', flags=re.IGNORECASE)
-    re_comment = re.compile(r'#(.*)$')
+    re_flag = re.compile(r'^\s*flag\s+(.+)\s*', flags=re.IGNORECASE)
+    re_unflag = re.compile(r'^\s*unflag\s+', flags=re.IGNORECASE)
+    re_comment = re.compile(r'^\s*#(.*)$')
 
-    def __init__(self, file, file_name = ''):
-        if type(file) == str:
-            self.file_name = file
 
-            with open(file, 'r') as in_file:
-                self._read_from(in_file)
-        else:
-            self.file_name = file_name
-            self._read_from(file)
+    def __init__(self, file_name = ''):
+        self.file_name = file_name
+        self.scenes = [HamFileScene()]
+
+
+    def append_scene_line(self, name:str) -> HamFileScene:
+        scene = HamFileScene(name)
+        line = InstructionLine('scene', name)
+        self.scenes[-1].lines.append(line)
+        return scene
+
+    def get_variable(self, name:str):
+        line = self.find_variable_line(name)
+        if not line:
+            return None
+
+        return line.value()
+
+
+    def set_variable(self, name:str, value:str):
+        line = self.find_variable_line(name)
+        if not line:
+            line = VariableLine(name, value)
+            self.scenes[0].lines.append(line)
+
+        line.value(value)
+
+
+    def find_variable_line(self, name:str) -> VariableLine:
+        for scene in self.scenes:
+            for line in scene.lines:
+                try:
+                    if line.name() == name:
+                        return line
+                except AttributeError:
+                    pass
+        return None
 
     def fill_variables(self, text:str) -> str:
         def sub(match: re.Match[str]) -> str:
@@ -28,53 +59,52 @@ class HamFile:
 
         return HamFile.re_variable.sub(sub, str(text))
 
-    def _read_from(self, file):        
-        self.variables = self._read_variables(file)
-        self.scenes = self._read_scenes(file)
 
-    def _read_variables(self, file) -> 'dict[str:str]':
-        variables = {}
+    # def _read_variables(self, file) -> 'dict[str:str]':
+    #     line_number = 0
+    #     file.seek(0)
+    #     for line in file:
+    #         line_number += 1
 
-        line_number = 0
-        file.seek(0)
-        for line in file:
-            line_number += 1
+    #         # Ignore Comments
+    #         # line = HamFile.re_comment.sub('', line).strip()
 
-            # Ignore Comments
-            line = HamFile.re_comment.sub('', line).strip()
+    #         match = HamFile.re_assignment.match(line)
 
-            match = HamFile.re_assignment.match(line)
-            if match:
-                var_name = match.group(1).upper()
-                value = match.group(2)
-                if var_name in variables:
-                    raise HamFileError("Variable already exists", line_number, self.file_name)
-                variables[var_name] = value
 
-        return variables
-    
     def _read_scenes(self, file) -> 'list[HamFileScene]':
-        scenes = []
-
         line_number = 0
         file.seek(0)
 
-        current_scene = None
+        current_scene = self.scenes[0]
+        del self.scenes[:]
+
         current_speaker = None
         current_flags = ()
 
-        text = ""
-
-        def add_line(text: str):
+        def add_line(raw_line:str, text: str):
             if not current_speaker:
                 raise HamFileError("No speaker", line_number, self.file_name)
             if not current_scene:
                 raise HamFileError("No scene", line_number, self.file_name)
 
-            line = HamFileLine(current_speaker, text.strip(), current_flags)
+            text = text.strip()
+
+            match = HamFile.re_line_action.match(text)
+            if match:
+                text = text[match.end():]
+                action = match.group(1)
+            else:
+                action = ''
+
+            line = TextLine(current_speaker, text.strip(), current_flags, raw_line)    
             current_scene.lines.append(line)
+
+            if match:
+                line.action(action)
         
         for line in file:
+            raw_line = line
             line_number += 1
 
             # Skip comments/blanks
@@ -82,14 +112,29 @@ class HamFile:
             if len(line) == 0:
                 continue
 
-            # Skip assignments
-            if HamFile.re_assignment.match(line):
+            # Actions
+            match = HamFile.re_action.match(line)
+            if match:
+                current_scene.lines.append(InstructionLine('ACTION', match.group(1).strip()))
+                continue
+
+            # Variable assignments
+            match = HamFile.re_assignment.match(line)
+            if match:
+                var_name = match.group(1).upper()
+                value = match.group(2)
+                variable_line = self.find_variable_line(var_name)
+                if variable_line:
+                    raise HamFileError("Variable already exists", line_number, self.file_name)
+                variable_line = VariableLine(var_name, value, raw_line=raw_line)
+                current_scene.lines.append(variable_line)
                 continue
 
             # Set Flag
             match = HamFile.re_flag.match(line)
             if match:
-                flag = match.groups(1)[0]
+                flag = match.groups(1)[0].lower()
+                flag = re.sub( r'\s+', ' ', flag)
                 current_flags += (flag,)
                 continue
 
@@ -101,14 +146,10 @@ class HamFile:
             # Scene Change
             match = HamFile.re_scene_change.match(line)
             if match:
-                if text:
-                    add_line(text)
-                    text = ""
-
                 current_speaker = None
-            
+
                 if current_scene:
-                    scenes.append(current_scene)
+                    self.scenes.append(current_scene)
                 current_scene = HamFileScene(match.group(1))
                 current_flags = ()
                 continue
@@ -117,27 +158,31 @@ class HamFile:
             match = HamFile.re_speaker_change.match(line)
             if match:
                 speaker_var = 'VOICE_' + match.group(1).upper()
-                try:
-                    next_speaker = self.variables[speaker_var]
-                except KeyError:
-                    next_speaker = match.group(1).lower()
+                current_speaker = self.get_variable(speaker_var)
+                if not  current_speaker:
+                    current_speaker = match.group(1).lower()
 
                 line = match.group(2)
 
-                if next_speaker == current_speaker:
-                    text += " " + line
-                elif current_speaker:
-                    add_line(text)
-                    text = ""
+            add_line(raw_line, line)
 
-                current_speaker = next_speaker
+        self.scenes.append(current_scene)
 
-            text += " " + line
 
-        if text:
-            add_line(text)
+def from_file(file_or_name, name:str='') -> 'HamFile':
+    if type(file_or_name) == str:
+        name = file_or_name
 
-        if current_scene:
-            scenes.append(current_scene)
+        ham = HamFile(name)
+        with open(name, 'r') as file_or_name:
+            # ham._read_variables(file_or_name)
+            ham._read_scenes(file_or_name)
+    else:
+        if len(name) == 0:
+            raise ValueError("name is required when reading an existing file")
 
-        return scenes
+        ham = HamFile(name)
+        # ham._read_variables(file_or_name)
+        ham._read_scenes(file_or_name)
+
+    return ham
