@@ -3,12 +3,13 @@ from .exceptions import *
 from .scene import *
 
 class HamFile:
-    re_instruction = re.compile(r'^\s*!\s*([a-z][a-z0-9]*)(?:\s+([^#]+).*)?$', flags=re.IGNORECASE)
+    re_instruction = re.compile(r'^!\s*([a-z][a-z0-9]*)(?:\s+([^#]+).*)?$', flags=re.IGNORECASE)
     re_assignment = re.compile(r'\s*([a-zA-Z]\w*)\s*=\s*(.+)\s*$')
     re_line_action = re.compile(r'\s*\[([^\]]*)\]\s*')
     re_speaker_change = re.compile(r'^(.+?)\s*:\s*(.*?)\s*$')
     re_variable = re.compile(r'\$([a-zA-Z]\w*)')
     re_comment = re.compile(r'^\s*#(.*)$')
+    re_continuation = re.compile(r'^\+\s*(.*)$')
 
 
     def __init__(self, file_name = ''):
@@ -30,12 +31,12 @@ class HamFile:
         self.scenes[-1].lines.append(line)
         return scene
 
-    def get_variable(self, name:str):
-        line = self.find_variable_line(name)
-        if not line:
-            return None
 
-        return line.value()
+    def get_variable(self, name:str) -> str:
+        try:
+            return self.find_variable_line(name).value()
+        except AttributeError:
+            return None
 
 
     def set_variable(self, name:str, value:str):
@@ -57,17 +58,17 @@ class HamFile:
                     pass
         return None
 
+    
     def fill_variables(self, text:str) -> str:
         def sub(match: re.Match[str]) -> str:
             var_name = match.group(1).upper()
-            return self.variables[var_name]
+            return self.get_variable(var_name)
 
         return HamFile.re_variable.sub(sub, str(text))
 
 
     def _read_scenes(self, file) -> 'list[HamFileScene]':
         line_number = 0
-        file.seek(0)
 
         current_scene = self.scenes[0]
         del self.scenes[:]
@@ -75,9 +76,8 @@ class HamFile:
         current_speaker = None
         current_flags = ()
 
-        comment = None
-
         def add_line(raw_line:str, text: str):
+            print("Adding: '%s'" % text)
             if not current_speaker:
                 raise HamFileError("No speaker", line_number, self.file_name)
             if not current_scene:
@@ -127,7 +127,10 @@ class HamFile:
             # Instructions
             match = HamFile.re_instruction.match(line)
             if match:
-                instruction = InstructionLine(match.group(1), match.group(2).strip())
+                instruction_text = match.group(2)
+                if not instruction_text:
+                    instruction_text = ''
+                instruction = InstructionLine(match.group(1), instruction_text.strip())
                 instruction_name = instruction.instruction()
 
                 if instruction_name == 'FLAG':
@@ -143,10 +146,21 @@ class HamFile:
 
                     if current_scene:
                         self.scenes.append(current_scene)
-                    current_scene = HamFileScene(match.group(1))
+                    current_scene = HamFileScene(instruction.text())
                     current_flags = ()
 
                 current_scene.lines.append(instruction)
+                continue
+
+            # Continuation
+            match = HamFile.re_continuation.match(line)
+            if match:
+                try:
+                    last_line = current_scene.lines[-1]
+                except IndexError:
+                    raise HamFileError("No line to continue")
+
+                last_line.text(last_line.text() + '\n' + match.group(1))
                 continue
 
             # Speaker Change
@@ -170,14 +184,12 @@ def from_file(file_or_name, name:str='') -> 'HamFile':
 
         ham = HamFile(name)
         with open(name, 'r') as file_or_name:
-            # ham._read_variables(file_or_name)
             ham._read_scenes(file_or_name)
     else:
         if len(name) == 0:
             raise ValueError("name is required when reading an existing file")
 
         ham = HamFile(name)
-        # ham._read_variables(file_or_name)
         ham._read_scenes(file_or_name)
 
     return ham
