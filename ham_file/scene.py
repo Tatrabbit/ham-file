@@ -29,7 +29,6 @@ class LineBase:
     def __init__(self, line:str=None):
         if line:
             line = line.rstrip()
-            self._raw_line = line
 
             def get_comment(line:str) -> str:
                 match = LineBase.re_line_comment.search(line)
@@ -40,15 +39,21 @@ class LineBase:
             self._line_comment = get_comment(line)
         else:
             self._line_comment = None
-            self._on_change()
+
 
     def raw(self) -> str:
+        raw = self._raw().split('\n')
+        raw = '\n+   '.join(raw)
+
         if self._line_comment:
-            return '%s #%s' % (self._raw_line, self._line_comment)
-        return self._raw_line
-    
+            return '%s #%s' % raw, self._line_comment()
+
+        return raw
+
+
     def pretty_print(self) -> str:
         return self.raw()
+
 
     def line_comment(self, value:str=None) -> str:
         if value:
@@ -58,6 +63,10 @@ class LineBase:
         if not self._line_comment:
             return ''
         return self._line_comment
+    
+
+    def __str__(self) -> str:
+        return self.raw()
 
 
 class CommentLine (LineBase):
@@ -73,8 +82,8 @@ class CommentLine (LineBase):
         return self._text
     
 
-    def _on_change(self):
-        self._raw_line = "#%s" % self._text
+    def _raw(self):
+        return "#%s" % self._text
 
 
 class InstructionLine (LineBase):
@@ -95,14 +104,12 @@ class InstructionLine (LineBase):
     def instruction(self, value:str=None) -> str:
         if value:
             self._instruction = value
-            self._on_change()
         return self._instruction
 
     
     def text(self, value:str=None) -> str:
         if value:
             self._text = value
-            self._on_change()
         return self._text
     
 
@@ -110,8 +117,8 @@ class InstructionLine (LineBase):
         return self._pretty_spaces + self.raw()
     
     
-    def _on_change(self):
-        self._raw_line = "!%s %s" % (self._instruction, self._text)
+    def _raw(self):
+        return "!%s %s" % (self._instruction, self._text)
     
 
 class VariableLine (LineBase):
@@ -125,23 +132,17 @@ class VariableLine (LineBase):
     def name(self, value:str=None) -> str:
         if value:
             self._name = value
-            self._on_change()
     
         return self._name
     
     def value(self, new_value:str=None) -> str:
         if new_value:
             self._value = new_value
-            self._on_change()
     
         return self._value
 
 
-    def _on_change(self):
-        self._raw_line = "%s = %s" % (self._name, self._value)
-
-
-    def __str__(self) -> str:
+    def _raw(self):
         return "%s = %s" % (self._name, self._value)
 
 
@@ -157,31 +158,29 @@ class TextLine (LineBase):
 
         super().__init__(raw_line)
 
+
     def speaker(self, value:str=None) -> str:
         if value:
             self._speaker = value
-            self._on_change()
         return self._speaker
+
 
     def text(self, value:str=None) -> str:
         if value:
             self._text = value
-            self._on_change()
         return self._text
     
+
     def action(self, value:str=None) -> str:
         if value:
             self._action = value
-            self._on_change()
         return self._action
 
-    def _on_change(self):
+
+    def _raw(self):
         if len(self._action) > 0:
             action = ' [%s]' % self._action
         else:
             action = ''
     
-        self._raw_line = "%s:%s %s" % (self._speaker.capitalize(), action, self._text)
-
-    def __str__(self) -> str:
-        return "%s: %s" % (self._speaker.capitalize(), self._text)
+        return "%s:%s %s" % (self._speaker.capitalize(), action, self._text)

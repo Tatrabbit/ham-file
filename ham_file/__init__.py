@@ -78,7 +78,6 @@ class HamFile:
         current_flags = ()
 
         def add_line(raw_line:str, text: str):
-            print("Adding: '%s'" % text)
             if not current_speaker:
                 raise HamFileError("No speaker", line_number, self.file_name)
             if not current_scene:
