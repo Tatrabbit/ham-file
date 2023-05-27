@@ -49,13 +49,14 @@ class HamFile:
 
 
     def find_variable_line(self, name:str) -> VariableLine:
+        name = name.upper()
+
         for scene in self.scenes:
             for line in scene.lines:
-                try:
-                    if line.name() == name:
-                        return line
-                except AttributeError:
-                    pass
+                if not type(line) is VariableLine:
+                    continue
+                if line.name() == name:
+                    return line
         return None
 
     
