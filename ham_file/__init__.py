@@ -24,6 +24,26 @@ class HamFile:
             for line in scene.lines:
                 text.append(line.pretty_print())
         return '\n'.join(text)
+    
+
+    def variables(self):
+        for scene in self.scenes:
+            yield from scene.variables()
+    
+
+    def to_dict(self):
+        obj = {}
+
+        obj['scenes'] = []
+        for scene in self.scenes:
+            scene_dict = scene.to_dict(self)
+            if len(scene_dict['lines']) == 0:
+                continue
+            obj['scenes'].append(scene_dict)
+
+        obj['variables'] = [v.to_dict(self) for v in self.variables()]
+        return obj
+
 
     def append_scene_line(self, name:str) -> HamFileScene:
         scene = HamFileScene(name)
@@ -33,10 +53,10 @@ class HamFile:
 
 
     def get_variable(self, name:str) -> str:
-        try:
-            return self.find_variable_line(name).value()
-        except AttributeError:
+        line = self.find_variable_line(name)
+        if not line:
             return None
+        return line.value()
 
 
     def set_variable(self, name:str, value:str):
@@ -46,6 +66,13 @@ class HamFile:
             self.scenes[0].lines.append(line)
 
         line.value(value)
+
+
+    def get_scene(self, line:LineBase):
+        for scene in self.scenes:
+            if line in scene.lines:
+                return scene
+        return None
 
 
     def find_variable_line(self, name:str) -> VariableLine:
@@ -76,6 +103,7 @@ class HamFile:
 
         current_speaker = None
         current_flags = ()
+        current_speech_time = None
 
         def add_line(raw_line:str, text: str):
             if not current_speaker:
@@ -92,7 +120,9 @@ class HamFile:
             else:
                 action = ''
 
-            line = TextLine(current_speaker, text.strip(), current_flags, raw_line)
+            line = TextLine(raw_line, current_speaker, text.strip(), current_flags)
+            line.time = current_speech_time
+
             current_scene.lines.append(line)
 
             if match:
@@ -106,7 +136,9 @@ class HamFile:
             # Strip Comments
             match = HamFile.re_comment.match(line)
             if match:
-                current_scene.lines.append(CommentLine(match.group(1)))
+                comment_line = CommentLine(raw_line, match.group(1))
+                comment_line.time = current_speech_time
+                current_scene.lines.append(comment_line)
                 continue
 
             if len(line) == 0:
@@ -120,7 +152,7 @@ class HamFile:
                 variable_line = self.find_variable_line(var_name)
                 if variable_line:
                     raise HamFileError("Variable already exists", line_number, self.file_name)
-                variable_line = VariableLine(var_name, value, raw_line=raw_line)
+                variable_line = VariableLine(raw_line, var_name, value)
                 current_scene.lines.append(variable_line)
                 continue
 
@@ -130,7 +162,10 @@ class HamFile:
                 instruction_text = match.group(2)
                 if not instruction_text:
                     instruction_text = ''
-                instruction = InstructionLine(match.group(1), instruction_text.strip())
+
+                instruction = InstructionLine(raw_line, match.group(1), instruction_text.strip())
+                instruction.time = current_speech_time
+
                 instruction_name = instruction.instruction()
 
                 if instruction_name == 'FLAG':
@@ -148,6 +183,12 @@ class HamFile:
                         self.scenes.append(current_scene)
                     current_scene = HamFileScene(instruction.text())
                     current_flags = ()
+
+                elif instruction_name == 'SPEECHTIME':
+                    try:
+                        current_speech_time = float(instruction.text())
+                    except ValueError:
+                        raise HamFileError("Expected float for SPEECHTIME, got '%s'" % instruction.text(), line_number, self.file_name)
 
                 current_scene.lines.append(instruction)
                 continue
@@ -168,7 +209,7 @@ class HamFile:
             if match:
                 speaker_var = 'VOICE_' + match.group(1).upper()
                 current_speaker = self.get_variable(speaker_var)
-                if not  current_speaker:
+                if not current_speaker:
                     current_speaker = match.group(1).lower()
 
                 line = match.group(2)
