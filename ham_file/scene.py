@@ -58,7 +58,7 @@ class LineBase:
         raw = '\n+   '.join(raw)
 
         if self._line_comment:
-            return '%s #%s' % raw, self._line_comment()
+            return '%s #%s' % (raw, self._line_comment)
 
         return raw
 
@@ -102,7 +102,10 @@ class CommentLine (LineBase):
         super().__init__(raw_line)
         self.kind = 'comment'
 
-        self._text = text.rstrip()
+        if text is not None:
+            self._text = text.rstrip()
+        else:
+            self._text = None
 
 
     def name(self) -> str:
@@ -122,7 +125,10 @@ class CommentLine (LineBase):
 
 
     def _raw(self):
-        return "#%s" % self._text
+        if self._text is not None:
+            return "#%s" % self._text
+        else:
+            return ''
 
 
 class InstructionLine (LineBase):

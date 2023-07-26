@@ -142,6 +142,7 @@ class HamFile:
                 continue
 
             if len(line) == 0:
+                current_scene.lines.append(CommentLine('', None))
                 continue
 
             # Variable assignments
