@@ -49,7 +49,7 @@ class LineBase:
     def __init__(self, raw_line:str):            
         self._line_comment = self._parse_line_comment(raw_line)
         self.time = None
-
+        self.original_line_number = None
         self.exclude_from_json_lines = False
 
 

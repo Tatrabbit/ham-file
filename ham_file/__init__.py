@@ -3,8 +3,8 @@ from .exceptions import *
 from .scene import *
 
 class HamFile:
-    re_instruction = re.compile(r'^!\s*([a-z][a-z0-9]*)(?:\s+([^#]+).*)?$', flags=re.IGNORECASE)
-    re_assignment = re.compile(r'\s*([a-zA-Z]\w*)\s*=\s*(.+)\s*$')
+    re_instruction = re.compile(r'^!\s*([a-z_][a-z_0-9]*)(?:\s+([^#]+).*)?$', flags=re.IGNORECASE)
+    re_assignment = re.compile(r'\s*([a-zA-Z_]\w*)\s*=\s*(.+)\s*$')
     re_line_action = re.compile(r'\s*\[([^\]]*)\]\s*')
     re_speaker_change = re.compile(r'^(.+?)\s*:\s*(.*?)\s*$')
     re_variable = re.compile(r'\$([a-zA-Z]\w*)')
@@ -142,7 +142,9 @@ class HamFile:
                 continue
 
             if len(line) == 0:
-                current_scene.lines.append(CommentLine('', None))
+                blank_line = CommentLine('', None)
+                blank_line.original_line_number = line_number
+                current_scene.lines.append(blank_line)
                 continue
 
             # Variable assignments
@@ -154,6 +156,7 @@ class HamFile:
                 if variable_line:
                     raise HamFileError("Variable already exists", line_number, self.file_name)
                 variable_line = VariableLine(raw_line, var_name, value)
+                variable_line.original_line_number = line_number
                 current_scene.lines.append(variable_line)
                 continue
 
@@ -165,6 +168,7 @@ class HamFile:
                     instruction_text = ''
 
                 instruction = InstructionLine(raw_line, match.group(1), instruction_text.strip())
+                instruction.original_line_number = line_number
                 instruction.time = current_speech_time
 
                 instruction_name = instruction.instruction()
