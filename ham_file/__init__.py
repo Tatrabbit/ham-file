@@ -22,7 +22,7 @@ class HamFile:
 
         for scene in self.scenes:
             for line in scene.lines:
-                text.append(line.pretty_print())
+                text.append(str(line))
         return '\n'.join(text)
     
 

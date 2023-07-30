@@ -61,11 +61,7 @@ class LineBase:
             return '%s #%s' % (raw, self._line_comment)
 
         return raw
-
-
-    def pretty_print(self) -> str:
-        return self.raw()
-
+    
 
     def line_comment(self, value:str=None) -> str:
         if value:
@@ -139,13 +135,6 @@ class InstructionLine (LineBase):
         self._instruction = instruction.upper().strip()
         self._text = text.strip()
 
-        if self._instruction == 'SCENE':
-            self._pretty_spaces = '\n\n'
-        elif self._instruction == 'ACTION':
-            self._pretty_spaces = '  '
-        else:
-            self._pretty_spaces = ''
-
     # TODO remove, just use self.name
     def instruction(self, value:str=None) -> str:
         if value:
@@ -161,11 +150,6 @@ class InstructionLine (LineBase):
         if value:
             self._text = value
         return self._text
-
-
-    def pretty_print(self) -> str:
-        return self._pretty_spaces + self.raw()
-
     
     def _raw(self):
         return "!%s %s" % (self._instruction, self._text)
