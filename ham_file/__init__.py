@@ -29,7 +29,6 @@ class HamFile:
     def variables(self):
         for scene in self.scenes:
             yield from scene.variables()
-    
 
     def to_dict(self):
         obj = {}
@@ -62,8 +61,9 @@ class HamFile:
     def set_variable(self, name:str, value:str):
         line = self.find_variable_line(name)
         if not line:
-            line = VariableLine(name, value)
+            line = VariableLine(f'{name} = {value}', name, value)
             self.scenes[0].lines.append(line)
+            return
 
         line.value(value)
 
@@ -205,7 +205,7 @@ class HamFile:
                     last_line = current_scene.lines[-1]
                 except IndexError:
                     raise HamFileError("No line to continue")
-
+                
                 last_line.text(last_line.text() + '\n' + match.group(1))
                 continue
 

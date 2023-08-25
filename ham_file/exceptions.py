@@ -14,5 +14,6 @@ class HamRuntimeError(HamFileError):
         self.file = file_name
 
     def __str__(self) -> str:
-        return "Runtime Error: %s on line %s (%s)\n" % (self.msg, self.line, self.file)
+        file_name = " (%s)" % self.file if self.file else ''
+        return "Runtime Error: %s on line %s%s\n" % (self.msg, self.line, file_name)
     
