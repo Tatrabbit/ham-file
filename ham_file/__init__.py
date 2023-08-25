@@ -30,6 +30,13 @@ class HamFile:
         for scene in self.scenes:
             yield from scene.variables()
 
+
+    def lines(self):
+        for scene in self.scenes:
+            for line in scene.lines:
+                yield line
+
+
     def to_dict(self):
         obj = {}
 
