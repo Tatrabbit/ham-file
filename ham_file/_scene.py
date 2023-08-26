@@ -1,5 +1,4 @@
 import regex as re
-import ham_file as HamFile
 
 class HamFileScene:
     def __init__(self, name=None):
@@ -36,7 +35,7 @@ class HamFileScene:
         return set(all)
     
 
-    def to_dict(self, ham:HamFile) -> dict:
+    def to_dict(self, ham) -> dict:
         return {
             'flags': list(self.unique_flags()),
             'lines': [l.to_dict(ham) for l in self.lines if not l.exclude_from_json_lines],
@@ -70,7 +69,7 @@ class LineBase:
         return self._line_comment or ''
 
 
-    def to_dict(self, ham:HamFile) -> 'dict':
+    def to_dict(self, ham) -> 'dict':
         return {
             'kind': self.kind,
             'name': self.name(),
@@ -182,7 +181,7 @@ class VariableLine (LineBase):
         return self._value
     
 
-    def to_dict(self, ham:HamFile) -> 'dict':
+    def to_dict(self, ham) -> 'dict':
         return {
             'name': self.name(),
             'value': self.text(),
