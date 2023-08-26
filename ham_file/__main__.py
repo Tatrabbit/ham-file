@@ -4,7 +4,7 @@ from __init__ import *
 from exceptions import *
 from ham_file import *
 
-def unit_test():
+def _unit_test():
     try:
         file = HamFile.from_file(sys.argv[1])
 
@@ -26,4 +26,4 @@ def unit_test():
         exit(1)
 
 if __name__ == '__main__':
-    unit_test()
+    _unit_test()
