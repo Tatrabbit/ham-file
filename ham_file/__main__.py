@@ -3,10 +3,11 @@ import sys
 from __init__ import *
 from exceptions import *
 from ham_file import *
+from ham_file.exceptions import *
 
 def _unit_test():
     try:
-        file = HamFile.from_file(sys.argv[1])
+        file = from_file(sys.argv[1])
 
         for scene in file.scenes:
             print(scene)
