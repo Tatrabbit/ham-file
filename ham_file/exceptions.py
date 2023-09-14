@@ -1,5 +1,5 @@
 class HamFileError(Exception):
-    def __init__(self, msg:str, line:int, file_name:str):
+    def __init__(self, msg: str, line: int, file_name: str):
         self.msg = msg
         self.line = line
         self.file = file_name
@@ -9,12 +9,11 @@ class HamFileError(Exception):
 
 
 class HamRuntimeError(HamFileError):
-    def __init__(self, msg:str, line:int, file_name:str):
+    def __init__(self, msg: str, line: int, file_name: str):
         self.msg = msg
         self.line = line
         self.file = file_name
 
     def __str__(self) -> str:
-        file_name = " (%s)" % self.file if self.file else ''
+        file_name = " (%s)" % self.file if self.file else ""
         return "Runtime Error: %s on line %s%s\n" % (self.msg, self.line, file_name)
-    

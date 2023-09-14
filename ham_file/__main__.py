@@ -5,6 +5,7 @@ from exceptions import *
 from ham_file import *
 from ham_file.exceptions import *
 
+
 def _unit_test():
     try:
         file = from_file(sys.argv[1])
@@ -26,5 +27,6 @@ def _unit_test():
         print(e)
         exit(1)
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     _unit_test()

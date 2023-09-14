@@ -1,31 +1,28 @@
 import regex as re
 
+
 class HamFileScene:
     def __init__(self, name=None):
         self.name = name
         self.lines = []
 
-
     def __str__(self) -> str:
         if not self.name:
             return "Blank Scene"
         return "Scene " + self.name
-    
-    
+
     def variables(self):
         for line in self.lines:
-            if type (line) is VariableLine:
+            if type(line) is VariableLine:
                 yield line
-    
 
     def contains_flag(self, flag):
         for line in self.lines:
             if flag in line.flags:
                 return True
         return False
-    
 
-    def unique_flags(self) -> 'set[str]':
+    def unique_flags(self) -> "set[str]":
         all = []
         for line in self.lines:
             try:
@@ -33,12 +30,13 @@ class HamFileScene:
             except AttributeError:
                 pass
         return set(all)
-    
 
     def to_dict(self, ham) -> dict:
         return {
-            'flags': list(self.unique_flags()),
-            'lines': [l.to_dict(ham) for l in self.lines if not l.exclude_from_json_lines],
+            "flags": list(self.unique_flags()),
+            "lines": [
+                l.to_dict(ham) for l in self.lines if not l.exclude_from_json_lines
+            ],
         }
 
 
@@ -51,33 +49,29 @@ class LineBase:
         self.original_line_number = None
         self.exclude_from_json_lines = False
 
-
     def raw(self) -> str:
-        raw = self._raw().split('\n')
-        raw = '\n+   '.join(raw)
+        raw = self._raw().split("\n")
+        raw = "\n+   ".join(raw)
 
         if self._line_comment:
-            return '%s #%s' % (raw, self._line_comment)
+            return "%s #%s" % (raw, self._line_comment)
 
         return raw
-    
 
-    def line_comment(self, value:str=None) -> str:
+    def line_comment(self, value: str = None) -> str:
         if value:
             self._line_comment = value.rstrip()
 
-        return self._line_comment or ''
+        return self._line_comment or ""
 
-
-    def to_dict(self, ham) -> 'dict':
+    def to_dict(self, ham) -> "dict":
         return {
-            'kind': self.kind,
-            'name': self.name(),
-            'text': self.text(),
+            "kind": self.kind,
+            "name": self.name(),
+            "text": self.text(),
         }
 
-    
-    def _parse_line_comment(self, line:str) -> str:
+    def _parse_line_comment(self, line: str) -> str:
         if not line:
             return
 
@@ -86,7 +80,6 @@ class LineBase:
         if not match:
             return None
         return match.groups()[0].strip()
-
 
     def __str__(self) -> str:
         return self.raw()
@@ -103,28 +96,24 @@ class CommentLine(LineBase):
         else:
             self._text = None
 
-
     def name(self) -> str:
-        return '#'
+        return "#"
 
-
-    def text(self, value:str=None) -> str:
+    def text(self, value: str = None) -> str:
         if value:
             self._text = value
             self._on_change()
         return self._text
-    
 
-    def _parse_line_comment(self, line:str) -> str:
+    def _parse_line_comment(self, line: str) -> str:
         # No line comments on comment lines!
         return None
-
 
     def _raw(self):
         if self._text is not None:
             return "#%s" % self._text
         else:
-            return ''
+            return ""
 
 
 class InstructionLine(LineBase):
@@ -137,21 +126,19 @@ class InstructionLine(LineBase):
         self._text = text.strip()
 
     # TODO remove, just use self.name
-    def instruction(self, value:str=None) -> str:
+    def instruction(self, value: str = None) -> str:
         if value:
             self._instruction = value
         return self._instruction
-    
 
-    def name(self, value:str=None) -> str:
+    def name(self, value: str = None) -> str:
         return self.instruction(value)
 
-    
-    def text(self, value:str=None) -> str:
+    def text(self, value: str = None) -> str:
         if value:
             self._text = value
         return self._text
-    
+
     def _raw(self):
         return "!%s %s" % (self._instruction, self._text)
 
@@ -167,27 +154,26 @@ class VariableLine(LineBase):
 
         self.exclude_from_json_lines = True
 
-    def name(self, value:str=None) -> str:
+    def name(self, value: str = None) -> str:
         if value:
             self._name = value
-    
+
         return self._name
-    
-    def text(self, value:str=None) -> str:
+
+    def text(self, value: str = None) -> str:
         return self.value(value)
 
     # TODO remove
-    def value(self, new_value:str=None) -> str:
+    def value(self, new_value: str = None) -> str:
         if new_value:
             self._value = new_value
-    
-        return self._value
-    
 
-    def to_dict(self, ham) -> 'dict':
+        return self._value
+
+    def to_dict(self, ham) -> "dict":
         return {
-            'name': self.name(),
-            'value': self.text(),
+            "name": self.name(),
+            "value": self.text(),
         }
 
     def _raw(self):
@@ -204,20 +190,17 @@ class TextLine(LineBase):
 
         self._speaker = speaker.strip()
         self._text = text.strip()
-        self._action = ''
+        self._action = ""
         self.flags = flags
 
-
     # TODO remove, just use self.name
-    def speaker(self, value:str=None) -> str:
+    def speaker(self, value: str = None) -> str:
         if value:
             self._speaker = value
         return self._speaker
-    
 
-    def name(self, value:str=None) -> str:
+    def name(self, value: str = None) -> str:
         return self.speaker(value)
-
 
     # TODO return full text, add methods for parsing speech/action
     def text(self, value: str = None) -> str:
