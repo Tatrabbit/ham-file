@@ -1,4 +1,6 @@
 import sys
+import os
+import configparser
 import argparse
 import regex as re
 
@@ -19,7 +21,41 @@ def add_ham_outputs(parser:argparse.ArgumentParser, required:bool=False):
     return group
 
 
-def get_ham_file(args:argparse.Namespace):
+def get_config(path: str = "", config_name: str = "config.ini"):
+    fname = os.path.realpath(os.path.join(os.path.dirname(__file__), path, config_name))
+
+    parser = configparser.ConfigParser()
+    try:
+        with open(fname, "r") as f:
+            parser.read_file(f, source=fname)
+
+    except FileNotFoundError:
+        sys.stderr.write(f"{config_name} not found. Please configure.\n")
+
+        parser.add_section("gen_voice")
+        parser.set("gen_voice", "Enable Vits", "false")
+        parser.set("gen_voice", "Enable Tortoise", "false")
+
+        parser.add_section("gen_text")
+        parser.set("gen_text", "LLaMa API Flavor", "ChatGPT")  # ChatGPT | KoboldAI
+        parser.set("gen_text", "LLaMa API Endpoint", "http://127.0.0.1:5000/api")
+        parser.set("gen_text", "NovelAI API Key", "")
+
+        with open(fname, "w") as f:
+            parser.write(f)
+
+    except configparser.Error as e:
+        sys.stderr.write("%s\n" % str(e))
+        exit(-1)
+
+    for section in ["gen_voice", "gen_text"]:
+        if not parser.has_section(section):
+            parser.add_section(section)
+
+    return parser
+
+
+def get_ham_file(args: argparse.Namespace):
     if args.file:
         return args.file, None
     else:
