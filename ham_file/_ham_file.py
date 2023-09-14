@@ -3,13 +3,15 @@ from .exceptions import *
 from ._scene import *
 
 class HamFile:
-    re_instruction = re.compile(r'^!\s*([a-z_][a-z_0-9]*)(?:\s+([^#]+).*)?$', flags=re.IGNORECASE)
-    re_assignment = re.compile(r'\s*([a-zA-Z_]\w*)\s*=\s*(.+)\s*$')
-    re_line_action = re.compile(r'\s*\[([^\]]*)\]\s*')
-    re_speaker_change = re.compile(r'^(.+?)\s*:\s*(.*?)\s*$')
-    re_variable = re.compile(r'\$([a-zA-Z]\w*)')
-    re_comment = re.compile(r'^\s*#(.*)$')
-    re_continuation = re.compile(r'^\+\s*(.*)$')
+    re_instruction = re.compile(
+        r"^!\s*([a-z_][a-z_0-9]*)(?:\s+([^#]+).*)?$", flags=re.IGNORECASE
+    )
+    re_assignment = re.compile(r"\s*([a-zA-Z_]\w*)\s*=\s*(.+)\s*$")
+    re_line_action = re.compile(r"\s*\[([^\]]*)\]\s*")
+    re_speaker_change = re.compile(r"^(.+?)\s*:\s*(.*?)\s*$")
+    re_variable = re.compile(r"(?<!\\)(?:\$([a-zA-Z]\w*))")
+    re_comment = re.compile(r"^\s*#(.*)$")
+    re_continuation = re.compile(r"^\+\s*(.*)$")
 
 
     def __init__(self, file_name = ''):
@@ -98,6 +100,9 @@ class HamFile:
         def sub(match: re.Match[str]) -> str:
             var_name = match.group(1).upper()
             return self.get_variable(var_name)
+
+        text = HamFile.re_variable.sub(sub, str(text))
+        return text.replace("\\$", "$")
 
     def parse_instruction_args(self, text: str) -> dict[str, str]:
         """
