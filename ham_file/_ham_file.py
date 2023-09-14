@@ -99,10 +99,60 @@ class HamFile:
             var_name = match.group(1).upper()
             return self.get_variable(var_name)
 
-        return HamFile.re_variable.sub(sub, str(text))
+    def parse_instruction_args(self, text: str) -> dict[str, str]:
+        """
+        Parse a foo="bar baz" style text.
 
+        The format is comma separated, key = value, with optional quotes on value.
+        Keys are stored casefolded in the dict. spaces to the left and right of a value
+        are stripped, and if the optional quotes are present, they are removed. Leading
+        or trailing whitespace, if desired, can be protected by the use of these quotes.
 
-    def _read_scenes(self, file) -> 'list[HamFileScene]':
+        Values have $constant replacement performed.
+
+        Examples:
+        lines = 1, only = $TOM, action = "to himself, in the kitchen"
+        action=opening the front door, first=$TOM
+        """
+
+        def parse_name(start: int) -> tuple[str, int]:
+            name = ""
+            for i in range(start, len(text)):
+                if text[i] == "=":
+                    return name.casefold().strip(), i + 1
+                name += text[i]
+
+            raise ValueError(f"Unable to parse Key Values: ({text})")
+
+        def parse_value(start: int) -> tuple[str, int]:
+            value, idx = _read_string(text, start)
+            value = self.fill_variables(value)
+            return (value, idx)
+
+        # Fill dictionary, check unique
+        args: dict[str, str] = {}
+        i = 0
+        while i < len(text):
+            name, i = parse_name(i)
+            if not name:
+                break
+            value, i = parse_value(i)
+
+            try:
+                i = _advance_spaces(text, i)
+                i = text.index(",", i)
+            except ValueError:  # End of text
+                i = len(text)
+
+            i += 1
+
+            if name in args:
+                raise ValueError(f'Duplicate key "{name}" in Key Values: ({text})')
+            args[name] = value
+
+        return args
+
+    def _read_scenes(self, file) -> "list[HamFileScene]":
         line_number = 0
 
         current_scene = self.scenes[0]
@@ -246,3 +296,76 @@ def from_file(file_or_name, name:str='') -> 'HamFile':
         ham._read_scenes(file_or_name)
 
     return ham
+
+
+def _read_string(text: str, start: int = 0) -> tuple[str, int]:
+    if start >= len(text):
+        raise ValueError()
+
+    idx = _advance_spaces(text, start)
+
+    # Determine quote style
+    quote_style = text[idx]
+    if quote_style not in "\"'":
+        quote_style = None
+
+    if quote_style:
+        return _read_quote_string(text, idx + 1, quote_style)
+    else:
+        return _read_easy_string(text, idx)
+
+
+def _advance_spaces(text: str, start: int) -> int:
+    match = re.search(r"\S", text, pos=start)
+    if not match:
+        raise ValueError()
+    return match.start()
+
+
+def _read_quote_string(text: str, start: int, quote_style: str) -> tuple[str, int]:
+    idx = start
+    value = ""
+
+    # Read until close quotes
+    while idx < len(text):
+        next = text[idx]
+
+        if next == "\\":
+            try:
+                next = text[idx + 1]
+            except IndexError:
+                raise ValueError("Trailing \\")
+            # Re-escape $, for variable replacements
+            if quote_style == '"' and next == "$":
+                next = "\\$"
+
+            value += next
+            idx += 2
+            continue
+
+        # Auto-escape $ in single quotes
+        if quote_style == "'" and next == "$":
+            next = "\\$"
+
+        idx += 1
+
+        if next == quote_style:
+            return value, idx
+        value += next
+
+
+def _read_easy_string(text: str, start: int, terminators: str = ",") -> tuple[str, int]:
+    idx = start
+    value = ""
+
+    # Read until ,
+    while idx < len(text):
+        next = text[idx]
+
+        if next in terminators:
+            return value, idx
+
+        idx += 1
+        value += next
+
+    return value, idx
