@@ -220,13 +220,15 @@ class TextLine(LineBase):
 
 
     # TODO return full text, add methods for parsing speech/action
-    def text(self, value:str=None) -> str:
+    def text(self, value: str = None) -> str:
         if value:
             self._text = value
         return self._text
-    
 
-    def action(self, value:str=None) -> str:
+    def speech(self, value: str = None) -> str:
+        return self.text(value)
+
+    def action(self, value: str = None) -> str:
         if value:
             self._action = value
         return self._action
