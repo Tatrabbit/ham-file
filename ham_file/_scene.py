@@ -43,9 +43,9 @@ class HamFileScene:
 
 
 class LineBase:
-    re_line_comment = re.compile(r'#(.*)$')
+    re_line_comment = re.compile(r"#(.*)$")
 
-    def __init__(self, raw_line:str):            
+    def __init__(self, raw_line: str):
         self._line_comment = self._parse_line_comment(raw_line)
         self.time = None
         self.original_line_number = None
@@ -92,10 +92,11 @@ class LineBase:
         return self.raw()
 
 
-class CommentLine (LineBase):
-    def __init__(self, raw_line:str, text:str):
+class CommentLine(LineBase):
+    kind = "comment"
+
+    def __init__(self, raw_line: str, text: str):
         super().__init__(raw_line)
-        self.kind = 'comment'
 
         if text is not None:
             self._text = text.rstrip()
@@ -126,10 +127,11 @@ class CommentLine (LineBase):
             return ''
 
 
-class InstructionLine (LineBase):
-    def __init__(self, raw_line:str, instruction:str, text:str):
+class InstructionLine(LineBase):
+    kind = "instruction"
+
+    def __init__(self, raw_line: str, instruction: str, text: str):
         super().__init__(raw_line)
-        self.kind = 'instruction'
 
         self._instruction = instruction.upper().strip()
         self._text = text.strip()
@@ -152,12 +154,13 @@ class InstructionLine (LineBase):
     
     def _raw(self):
         return "!%s %s" % (self._instruction, self._text)
-    
 
-class VariableLine (LineBase):
-    def __init__(self, raw_line:str, name:str, value:str):
+
+class VariableLine(LineBase):
+    kind = "variable"
+
+    def __init__(self, raw_line: str, name: str, value: str):
         super().__init__(raw_line)
-        self.kind = 'variable'
 
         self._name = name.strip().upper()
         self._value = value.strip()
@@ -187,15 +190,17 @@ class VariableLine (LineBase):
             'value': self.text(),
         }
 
-
     def _raw(self):
         return "%s = %s" % (self._name, self._value)
 
 
-class TextLine (LineBase):
-    def __init__(self, raw_line:str, speaker:str, text:str, flags:'tuple[str]'=()):
+class TextLine(LineBase):
+    kind = "text"
+
+    def __init__(
+        self, raw_line: str, speaker: str, text: str, flags: "tuple[str]" = ()
+    ):
         super().__init__(raw_line)
-        self.kind = 'text'
 
         self._speaker = speaker.strip()
         self._text = text.strip()
@@ -225,7 +230,6 @@ class TextLine (LineBase):
         if value:
             self._action = value
         return self._action
-
 
     def _raw(self):
         speaker = self._speaker.capitalize()
