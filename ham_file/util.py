@@ -6,21 +6,39 @@ import regex as re
 
 
 def add_ham_inputs(parser: argparse.ArgumentParser):
-    group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument("-f", "--file", help="a .ham file to read")
-    group.add_argument("--stdin", action="store_true", help="read .ham from stdin")
+    group = _get_inputs_group(parser)
+
+    group = group.add_mutually_exclusive_group(required=True)
+    group.add_argument(
+        "-f", "--file", help="specify which Ham file to read", metavar="FILE_NAME"
+    )
+    group.add_argument("--stdin", action="store_true", help="read a Ham from stdin")
 
     return group
 
 
 def add_ham_outputs(parser: argparse.ArgumentParser, required: bool = False):
-    group = parser.add_mutually_exclusive_group(required=required)
-    group.add_argument("-o", "--out-file", help="file to write output ham to")
+    group = _get_inputs_group(parser)
+
+    group = group.add_mutually_exclusive_group(required=required)
     group.add_argument(
-        "--stdout", action="store_true", help="write output ham to stdout"
+        "-o", "--out-file", help="write output Ham to file", metavar="FILE_NAME"
+    )
+    group.add_argument(
+        "--stdout", action="store_true", help="write output Ham to stdout"
     )
 
     return group
+
+
+def _get_inputs_group(parser: argparse.ArgumentParser) -> argparse._ArgumentGroup:
+    try:
+        return parser.input_group
+    except AttributeError:
+        parser.input_group = parser.add_argument_group(
+            "input/output", "options to open and save Ham files"
+        )
+        return parser.input_group
 
 
 def get_config(path: str = "", config_name: str = "config.ini"):
