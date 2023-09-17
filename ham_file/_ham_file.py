@@ -86,10 +86,16 @@ class HamFile:
                     return line
         return None
 
-    def fill_variables(self, text: str) -> str:
+    def fill_variables(self, text: str, recurse: bool = True) -> str:
+        if recurse:
+            old_text = None
+            while old_text != text:
+                old_text = text
+                text = self.fill_variables(text, recurse=False)
+            return text
+
         def sub(match: re.Match[str]) -> str:
-            var_name = match.group(1).upper()
-            return self.get_variable(var_name)
+            return self.get_variable(match.group(1))
 
         text = HamFile.re_variable.sub(sub, str(text))
         return text.replace("\\$", "$")
