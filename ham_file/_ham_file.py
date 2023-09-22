@@ -253,7 +253,8 @@ class HamFile:
 
                 elif instruction_name == "SPEECHTIME":
                     try:
-                        current_speech_time = float(instruction.text())
+                        val = instruction.text().split(":")[0]
+                        current_speech_time = float(val)
                     except ValueError:
                         raise HamFileError(
                             "Expected float for SPEECHTIME, got '%s'"
