@@ -35,6 +35,13 @@ class HamFile:
             for line in scene.lines:
                 yield line
 
+    def get_scene_by_name(self, name:str) -> HamFileScene:
+        for scene in self.scenes:
+            if not scene.name:
+                continue
+            if scene.name.casefold() == name.casefold():
+                return scene
+
     def to_dict(self):
         obj = {}
 
