@@ -35,7 +35,7 @@ class HamFile:
             for line in scene.lines:
                 yield line
 
-    def get_scene_by_name(self, name:str) -> HamFileScene:
+    def get_scene_by_name(self, name: str) -> HamFileScene:
         for scene in self.scenes:
             if not scene.name:
                 continue
@@ -287,7 +287,7 @@ class HamFile:
             # Speaker Change
             match = HamFile.re_speaker_change.match(line)
             if match:
-                speaker_var = "VOICE_" + match.group(1).upper()
+                speaker_var = "VOICE_" + match.group(1).upper().replace(" ", "_")
                 current_speaker = self.get_variable(speaker_var)
                 if not current_speaker:
                     current_speaker = match.group(1).lower()
