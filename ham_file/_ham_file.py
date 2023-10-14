@@ -12,6 +12,7 @@ class HamFile:
     re_speaker_change = re.compile(r"^(.+?)\s*:\s*(.*?)\s*$")
     re_variable = re.compile(r"(?<!\\)(?:\$([a-zA-Z]\w*))")
     re_comment = re.compile(r"^\s*#(.*)$")
+    re_scene = re.compile(r"\s*==\s*(.+?)\s*==\s*$")
     re_continuation = re.compile(r"^\+\s*(.*)$")
 
     def __init__(self, file_name=""):
@@ -227,6 +228,18 @@ class HamFile:
                 current_scene.lines.append(variable_line)
                 continue
 
+            match = HamFile.re_scene.match(line)
+            if match:
+                current_speaker = None
+
+                if current_scene:
+                    self.scenes.append(current_scene)
+
+                name = match.group(1).casefold()
+                current_scene = HamFileScene(name)
+                current_flags = ()
+                continue
+
             # Instructions
             match = HamFile.re_instruction.match(line)
             if match:
@@ -251,12 +264,9 @@ class HamFile:
                     current_flags = ()
 
                 elif instruction_name == "SCENE":
-                    current_speaker = None
-
-                    if current_scene:
-                        self.scenes.append(current_scene)
-                    current_scene = HamFileScene(instruction.text())
-                    current_flags = ()
+                    raise HamFileError(
+                        "'!SCENE foo' is not supported! use '== foo =='\n"
+                    )
 
                 elif instruction_name == "SPEECHTIME":
                     try:
