@@ -62,17 +62,19 @@ class HamFile:
         self.scenes[-1].lines.append(line)
         return scene
 
-    def get_variable(self, name: str) -> str | None:
-        line = self.find_variable_line(name)
+    def get_variable(self, name: str, scene=None) -> str | None:
+        line = self.find_variable_line(name, scene)
         if not line:
             return None
         return line.value()
 
-    def set_variable(self, name: str, value: str):
-        line = self.find_variable_line(name)
+    def set_variable(self, name: str, value: str, scene=None):
+        line = self.find_variable_line(name, scene)
         if not line:
             line = VariableLine(f"{name} = {value}", name, value)
-            self.scenes[0].lines.append(line)
+            if not scene:
+                scene = self.scenes[0]
+                scene.lines.append(line)
             return
 
         line.value(value)
@@ -83,27 +85,38 @@ class HamFile:
                 return scene
         return None
 
-    def find_variable_line(self, name: str) -> VariableLine:
+    def find_variable_line(
+        self, name: str, preferred_scene: HamFileScene = None
+    ) -> VariableLine:
         name = name.upper()
 
-        for scene in self.scenes:
+        def find_in(scene: HamFileScene):
             for line in scene.lines:
-                if not type(line) is VariableLine:
+                if line.kind != "variable":
                     continue
                 if line.name() == name:
                     return line
+
+        if name.startswith("_"):
+            return find_in(preferred_scene) if preferred_scene else None
+
+        for scene in self.scenes:
+            find_in(scene)
+
         return None
 
-    def fill_variables(self, text: str, recurse: bool = True) -> str:
+    def fill_variables(
+        self, text: str, local_scene: HamFileScene = None, recurse: bool = True
+    ) -> str:
         if recurse:
             old_text = None
             while old_text != text:
                 old_text = text
-                text = self.fill_variables(text, recurse=False)
+                text = self.fill_variables(text, local_scene=local_scene, recurse=False)
             return text
 
         def sub(match: re.Match[str]) -> str:
-            return self.get_variable(match.group(1))
+            return self.get_variable(match.group(1), local_scene)
 
         text = HamFile.re_variable.sub(sub, str(text))
         return text.replace("\\$", "$")

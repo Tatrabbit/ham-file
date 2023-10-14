@@ -33,7 +33,7 @@ class HamFileScene:
 
     def to_dict(self, ham, include_comments: True) -> dict:
         def is_included(line: LineBase):
-            if line.exclude_from_json_lines:
+            if line.exclude_from_json_lines():
                 return False
 
             if include_comments:
@@ -44,13 +44,12 @@ class HamFileScene:
         return {
             # "flags": list(self.unique_flags()),
             "name": self.name,
-            "lines": [l.to_dict(ham) for l in self.lines if is_included(l)],
+            "lines": [l.to_dict(ham, self) for l in self.lines if is_included(l)],
         }
 
 
 class LineBase:
     re_line_comment = re.compile(r"#(.*)$")
-    exclude_from_json_lines = False
 
     def __init__(self, raw_line: str):
         self._line_comment = self._parse_line_comment(raw_line)
@@ -72,14 +71,17 @@ class LineBase:
 
         return self._line_comment or ""
 
-    def to_dict(self, ham) -> "dict":
+    def to_dict(self, ham, scene) -> "dict":
         return {
             "kind": self.kind,
             "name": self.name(),
-            "text": ham.fill_variables(self.text(), True),
+            "text": ham.fill_variables(self.text(), scene, True),
             "time": self.time or 0.0,
             "line_number": self.original_line_number,
         }
+
+    def exclude_from_json_lines(self):
+        return False
 
     def _parse_line_comment(self, line: str) -> str:
         if not line:
@@ -162,9 +164,6 @@ class VariableLine(LineBase):
         self._name = name.strip().upper()
         self._value = value.strip()
 
-        # TODO only exclude local variables
-        self.exclude_from_json_lines = True
-
     def name(self, value: str = None) -> str:
         if value:
             self._name = value
@@ -181,11 +180,14 @@ class VariableLine(LineBase):
 
         return self._value
 
-    def to_dict(self, ham) -> "dict":
+    def to_dict(self, ham, scene) -> "dict":
         return {
             "name": self.name(),
-            "value": ham.fill_variables(self.text(), recurse=True),
+            "value": ham.fill_variables(self.text(), scene, recurse=True),
         }
+
+    def exclude_from_json_lines(self):
+        return self.name().startswith("_")
 
     def _raw(self):
         return "%s = %s" % (self._name, self._value)
