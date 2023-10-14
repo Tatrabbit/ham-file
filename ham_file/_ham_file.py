@@ -10,7 +10,7 @@ class HamFile:
     re_assignment = re.compile(r"\s*([a-zA-Z_]\w*)\s*=\s*(.+)\s*$")
     re_line_action = re.compile(r"\s*\[([^\]]*)\]\s*")
     re_speaker_change = re.compile(r"^(.+?)\s*:\s*(.*?)\s*$")
-    re_variable = re.compile(r"(?<!\\)(?:\$([a-zA-Z]\w*))")
+    re_variable = re.compile(r"(?<!\\)(?:\$([_a-zA-Z]\w*))")
     re_comment = re.compile(r"^\s*#(.*)$")
     re_scene = re.compile(r"\s*==\s*(.+?)\s*==\s*$")
     re_continuation = re.compile(r"^\+\s*(.*)$")
@@ -48,12 +48,12 @@ class HamFile:
 
         obj["scenes"] = []
         for scene in self.scenes:
-            scene_dict = scene.to_dict(self)
+            scene_dict = scene.to_dict(self, include_comments=False)
             if len(scene_dict["lines"]) == 0:
                 continue
             obj["scenes"].append(scene_dict)
 
-        obj["variables"] = [v.to_dict(self) for v in self.variables()]
+        # obj["variables"] = [v.to_dict(self) for v in self.variables()]
         return obj
 
     def append_scene_line(self, name: str) -> HamFileScene:

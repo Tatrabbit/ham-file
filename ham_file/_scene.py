@@ -31,23 +31,31 @@ class HamFileScene:
                 pass
         return set(all)
 
-    def to_dict(self, ham) -> dict:
+    def to_dict(self, ham, include_comments: True) -> dict:
+        def is_included(line: LineBase):
+            if line.exclude_from_json_lines:
+                return False
+
+            if include_comments:
+                return True
+            else:
+                return line.kind != "comment"
+
         return {
-            "flags": list(self.unique_flags()),
-            "lines": [
-                l.to_dict(ham) for l in self.lines if not l.exclude_from_json_lines
-            ],
+            # "flags": list(self.unique_flags()),
+            "name": self.name,
+            "lines": [l.to_dict(ham) for l in self.lines if is_included(l)],
         }
 
 
 class LineBase:
     re_line_comment = re.compile(r"#(.*)$")
+    exclude_from_json_lines = False
 
     def __init__(self, raw_line: str):
         self._line_comment = self._parse_line_comment(raw_line)
         self.time = None
         self.original_line_number = None
-        self.exclude_from_json_lines = False
 
     def raw(self) -> str:
         raw = self._raw().split("\n")
@@ -68,7 +76,9 @@ class LineBase:
         return {
             "kind": self.kind,
             "name": self.name(),
-            "text": self.text(),
+            "text": ham.fill_variables(self.text(), True),
+            "time": self.time or 0.0,
+            "line_number": self.original_line_number,
         }
 
     def _parse_line_comment(self, line: str) -> str:
@@ -152,6 +162,7 @@ class VariableLine(LineBase):
         self._name = name.strip().upper()
         self._value = value.strip()
 
+        # TODO only exclude local variables
         self.exclude_from_json_lines = True
 
     def name(self, value: str = None) -> str:
@@ -173,7 +184,7 @@ class VariableLine(LineBase):
     def to_dict(self, ham) -> "dict":
         return {
             "name": self.name(),
-            "value": self.text(),
+            "value": ham.fill_variables(self.text(), recurse=True),
         }
 
     def _raw(self):
