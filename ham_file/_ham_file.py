@@ -7,6 +7,9 @@ class HamFile:
     re_instruction = re.compile(
         r"^!\s*([a-z_][a-z_0-9]*)(?:\s+([^#]+).*)?$", flags=re.IGNORECASE
     )
+    re_processor = re.compile(
+        r"^%\s*([a-z_][a-z_0-9]*)(?:\s+([^#]+).*)?$", flags=re.IGNORECASE
+    )
     re_assignment = re.compile(r"\s*([a-zA-Z_]\w*)\s*=\s*(.+)\s*$")
     re_line_action = re.compile(r"\s*\[([^\]]*)\]\s*")
     re_speaker_change = re.compile(r"^(.+?)\s*:\s*(.*?)\s*$")
@@ -181,8 +184,9 @@ class HamFile:
         del self.scenes[:]
 
         current_speaker = None
-        current_flags = ()
         current_speech_time = None
+        current_speech_duration = None
+        current_speech_padding = None
 
         def add_line(raw_line: str, text: str):
             if not current_speaker:
@@ -199,8 +203,11 @@ class HamFile:
             else:
                 action = ""
 
-            line = TextLine(raw_line, current_speaker, text.strip(), current_flags)
+            line = TextLine(raw_line, current_speaker, text.strip())
             line.time = current_speech_time
+            line.padding = current_speech_padding
+            line.duration = current_speech_duration
+            line.original_line_number = line_number
 
             current_scene.lines.append(line)
 
@@ -250,7 +257,33 @@ class HamFile:
 
                 name = match.group(1).casefold()
                 current_scene = HamFileScene(name)
-                current_flags = ()
+                continue
+
+            match = HamFile.re_processor.match(line)
+            if match:
+                name = match.group(1).casefold()
+                text = match.group(2).casefold()
+                if name == "t":
+
+                    def read_splits():
+                        splits = text.split(":")
+                        try:
+                            time = float(splits[0])
+                            return (time,) + tuple(
+                                float(t) for t in splits[1].split(",")
+                            )
+                        except ValueError:
+                            raise HamFileError(
+                                "Expected float for speech time, got '%s'" % text,
+                                line_number,
+                                self.file_name,
+                            )
+
+                    (
+                        current_speech_time,
+                        current_speech_duration,
+                        current_speech_padding,
+                    ) = read_splits()
                 continue
 
             # Instructions
@@ -268,15 +301,7 @@ class HamFile:
 
                 instruction_name = instruction.instruction()
 
-                if instruction_name == "FLAG":
-                    flag = instruction.text().lower()
-                    flag = re.sub(r"\s+", " ", flag)
-                    current_flags += (flag,)
-
-                elif instruction_name == "UNFLAG":
-                    current_flags = ()
-
-                elif instruction_name == "SCENE":
+                if instruction_name == "SCENE":
                     raise HamFileError(
                         "'!SCENE foo' is not supported! use '== foo =='\n"
                     )

@@ -16,21 +16,6 @@ class HamFileScene:
             if type(line) is VariableLine:
                 yield line
 
-    def contains_flag(self, flag):
-        for line in self.lines:
-            if flag in line.flags:
-                return True
-        return False
-
-    def unique_flags(self) -> "set[str]":
-        all = []
-        for line in self.lines:
-            try:
-                all += line.flags
-            except AttributeError:
-                pass
-        return set(all)
-
     def to_dict(self, ham, include_comments: True) -> dict:
         def is_included(line: LineBase):
             if line.exclude_from_json_lines():
@@ -42,7 +27,6 @@ class HamFileScene:
                 return line.kind != "comment"
 
         return {
-            # "flags": list(self.unique_flags()),
             "name": self.name,
             "lines": [l.to_dict(ham, self) for l in self.lines if is_included(l)],
         }
@@ -50,10 +34,10 @@ class HamFileScene:
 
 class LineBase:
     re_line_comment = re.compile(r"#(.*)$")
+    time = 0.0
 
     def __init__(self, raw_line: str):
         self._line_comment = self._parse_line_comment(raw_line)
-        self.time = None
         self.original_line_number = None
 
     def raw(self) -> str:
@@ -196,15 +180,15 @@ class VariableLine(LineBase):
 class TextLine(LineBase):
     kind = "text"
 
-    def __init__(
-        self, raw_line: str, speaker: str, text: str, flags: "tuple[str]" = ()
-    ):
+    padding = 0.0
+    duration = 0.0
+
+    def __init__(self, raw_line: str, speaker: str, text: str):
         super().__init__(raw_line)
 
         self._speaker = speaker.strip()
         self._text = text.strip()
         self._action = ""
-        self.flags = flags
 
     # TODO remove, just use self.name
     def speaker(self, value: str = None) -> str:
@@ -228,6 +212,12 @@ class TextLine(LineBase):
         if value:
             self._action = value
         return self._action
+
+    def to_dict(self, ham, scene) -> dict:
+        d = super().to_dict(ham, scene)
+        d["duration"] = self.duration
+        d["padding"] = self.padding
+        return d
 
     def _raw(self):
         speaker = self._speaker.capitalize()
