@@ -13,7 +13,7 @@ class HamFile:
     re_assignment = re.compile(r"\s*([a-zA-Z_]\w*)\s*=\s*(.+)\s*$")
     re_line_action = re.compile(r"\s*\[([^\]]*)\]\s*")
     re_speaker_change = re.compile(r"^(.+?)\s*:\s*(.*?)\s*$")
-    re_variable = re.compile(r"(?<!\\)(?:\$([_a-zA-Z]\w*))")
+    re_variable = re.compile(r"(?<!\\)(?:\$([_a-z]\w*))", flags=re.IGNORECASE)
     re_comment = re.compile(r"^\s*#(.*)$")
     re_scene = re.compile(r"\s*==\s*(.+?)\s*==\s*$")
     re_continuation = re.compile(r"^\+\s*(.*)$")
@@ -55,6 +55,24 @@ class HamFile:
             if len(scene_dict["lines"]) == 0:
                 continue
             obj["scenes"].append(scene_dict)
+
+        variables = []
+        for scene in self.scenes:
+            for variable in scene.variables():
+                name = variable.name()
+
+                is_local = name.startswith("_")
+                if is_local:
+                    continue
+
+                value = self.fill_variables(variable.text(), scene, recurse=True)
+
+                var = {
+                    "name": name,
+                    "value": value,
+                }
+                variables.append(var)
+        obj["variables"] = variables
 
         # obj["variables"] = [v.to_dict(self) for v in self.variables()]
         return obj
@@ -104,25 +122,44 @@ class HamFile:
             return find_in(preferred_scene) if preferred_scene else None
 
         for scene in self.scenes:
-            find_in(scene)
+            found = find_in(scene)
+            if found:
+                return found
 
         return None
 
     def fill_variables(
         self, text: str, local_scene: HamFileScene = None, recurse: bool = True
     ) -> str:
-        if recurse:
-            old_text = None
-            while old_text != text:
-                old_text = text
-                text = self.fill_variables(text, local_scene=local_scene, recurse=False)
-            return text
-
         def sub(match: re.Match[str]) -> str:
-            return self.get_variable(match.group(1), local_scene)
+            name = match.group(1)
+            variable_line = self.find_variable_line(name, local_scene)
+            if not variable_line:
+                return name
+            variable_scene = self.get_scene(variable_line)
+            value = variable_line.text()
+            if recurse:
+                value = self.fill_variables(
+                    variable_line.text(), variable_scene, recurse=True
+                )
+            return value
 
-        text = HamFile.re_variable.sub(sub, str(text))
+        text = self.re_variable.sub(sub, str(text))
         return text.replace("\\$", "$")
+
+        # self.find_variable_line()
+        # if recurse:
+        #     old_text = None
+        #     while old_text != text:
+        #         old_text = text
+        #         text = self.fill_variables(text, local_scene=local_scene, recurse=False)
+        #     return text
+
+        # def sub(match: re.Match[str]) -> str:
+        #     return self.get_variable(match.group(1), local_scene)
+
+        # text = HamFile.re_variable.sub(sub, str(text))
+        # return text.replace("\\$", "$")
 
     def parse_instruction_args(self, text: str) -> dict[str, str]:
         """
@@ -224,6 +261,7 @@ class HamFile:
             if match:
                 comment_line = CommentLine(raw_line, match.group(1))
                 comment_line.time = current_speech_time
+                comment_line.original_line_number = line_number
                 current_scene.lines.append(comment_line)
                 continue
 
@@ -255,14 +293,24 @@ class HamFile:
                 if current_scene:
                     self.scenes.append(current_scene)
 
-                name = match.group(1).casefold()
-                current_scene = HamFileScene(name)
+                name = match.group(1)
+                current_scene = HamFileScene(name.casefold())
+
+                processor_line = ProcessorLine(raw_line, "scene", name)
+                processor_line.original_line_number = line_number
+                current_scene.lines.append(processor_line)
                 continue
 
             match = HamFile.re_processor.match(line)
             if match:
-                name = match.group(1).casefold()
-                text = match.group(2).casefold()
+                name = match.group(1)
+                text = match.group(2)
+                processor_line = ProcessorLine(raw_line, name, text)
+                processor_line.original_line_number = line_number
+                current_scene.lines.append(processor_line)
+
+                name = name.casefold()
+                text = text.casefold()
                 if name == "t":
 
                     def read_splits():
@@ -345,6 +393,12 @@ class HamFile:
             add_line(raw_line, line)
 
         self.scenes.append(current_scene)
+
+    def find_line_scene(self, line: "LineBase") -> "HamFileScene":
+        for scene in self.scenes:
+            for scene_line in scene.lines:
+                if line is scene_line:
+                    return scene
 
 
 def from_file(file_or_name, name: str = "") -> "HamFile":

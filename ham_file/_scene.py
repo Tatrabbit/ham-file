@@ -35,10 +35,10 @@ class HamFileScene:
 class LineBase:
     re_line_comment = re.compile(r"#(.*)$")
     time = 0.0
+    original_line_number = -1
 
     def __init__(self, raw_line: str):
         self._line_comment = self._parse_line_comment(raw_line)
-        self.original_line_number = None
 
     def raw(self) -> str:
         raw = self._raw().split("\n")
@@ -60,6 +60,7 @@ class LineBase:
             "kind": self.kind,
             "name": self.name(),
             "text": ham.fill_variables(self.text(), scene, True),
+            # "text": self.text(),
             "time": self.time or 0.0,
             "line_number": self.original_line_number,
         }
@@ -83,17 +84,16 @@ class LineBase:
 
 class CommentLine(LineBase):
     kind = "comment"
+    _text = None
 
     def __init__(self, raw_line: str, text: str):
         super().__init__(raw_line)
 
-        if text is not None:
+        if text != None:
             self._text = text.rstrip()
-        else:
-            self._text = None
 
     def name(self) -> str:
-        return "#"
+        return "#" if self._text != None else "blank"
 
     def text(self, value: str = None) -> str:
         if value:
@@ -112,31 +112,56 @@ class CommentLine(LineBase):
             return ""
 
 
-class InstructionLine(LineBase):
-    kind = "instruction"
-
-    def __init__(self, raw_line: str, instruction: str, text: str):
+class PrefixLine(LineBase):
+    def __init__(self, raw_line: str, name: str, text: str):
         super().__init__(raw_line)
 
-        self._instruction = instruction.upper().strip()
+        self._name = name.strip().upper()
         self._text = text.strip()
 
-    # TODO remove, just use self.name
-    def instruction(self, value: str = None) -> str:
-        if value:
-            self._instruction = value
-        return self._instruction
-
     def name(self, value: str = None) -> str:
-        return self.instruction(value)
+        if value:
+            self._name = value
+        return self._name
 
     def text(self, value: str = None) -> str:
         if value:
             self._text = value
         return self._text
 
+
+class ProcessorLine(PrefixLine):
+    kind = "processor"
+
+    def __init__(self, raw_line: str, name: str, text: str):
+        super().__init__(raw_line, name=name, text=text)
+
     def _raw(self):
-        return "!%s %s" % (self._instruction, self._text)
+        if self._name == "SCENE":
+            return f"== {self._text} =="
+        else:
+            return "%%%s %s" % (self._name, self._text)
+
+    def exclude_from_json_lines(self):
+        # If other tools need access to processor lines,
+        # it indicates a more fundamental problem.
+        # Processor lines are meant to remain internal to
+        # the reader.
+        return True
+
+
+class InstructionLine(PrefixLine):
+    kind = "instruction"
+
+    def __init__(self, raw_line: str, instruction: str, text: str):
+        super().__init__(raw_line, name=instruction, text=text)
+
+    # TODO remove, just use self.name
+    def instruction(self, value: str = None) -> str:
+        return self.name(value)
+
+    def _raw(self):
+        return "!%s %s" % (self._name, self._text)
 
 
 class VariableLine(LineBase):
@@ -164,14 +189,15 @@ class VariableLine(LineBase):
 
         return self._value
 
-    def to_dict(self, ham, scene) -> "dict":
-        return {
-            "name": self.name(),
-            "value": ham.fill_variables(self.text(), scene, recurse=True),
-        }
+    # def to_dict(self, ham, scene) -> "dict":
+    #     return {
+    #         "name": self.name(),
+    #         "value": ham.fill_variables(self.text(), scene, recurse=True),
+    #     }
 
     def exclude_from_json_lines(self):
-        return self.name().startswith("_")
+        return True
+        # return self.name().startswith("_")
 
     def _raw(self):
         return "%s = %s" % (self._name, self._value)
@@ -215,6 +241,9 @@ class TextLine(LineBase):
 
     def to_dict(self, ham, scene) -> dict:
         d = super().to_dict(ham, scene)
+        d["text"] = f"[{self._action}] {self._text}"  # TODO/hack
+        # d["action"] = self._action
+
         d["duration"] = self.duration
         d["padding"] = self.padding
         return d
